@@ -13,11 +13,12 @@
 
 import glob, os
 import sys
-import _thread
+import multiprocessing
 import time
 
 
-rootPath = r'/home/vlad/Documents/Repo/consumerPattern/rand_files/'
+#rootPath = r'/home/vlad/Documents/Repo/consumerPattern/rand_files/'
+rootPath = r'C:/Docs/Mokslai/saugusProgramavimas/SecProgrammingTasks/rand_files/'
 searchExt = [".txt"]
 os.chdir(rootPath)
 
@@ -51,25 +52,36 @@ def getPrimary(n):
     else:
         for x in range(2,n):
             if(n % x==0):
-                print("!!! NOT Primary {}".format(n))
                 return False
         return True       
 
 
-def calculate(files, filesScanned, maxNum, minNum, threadname):
-    print("{} started...".format(threadname))
-    with open(files[filesScanned]) as f:
-        print("File: {} in thread {} scanning...".format(files[filesScanned],threadname))
+def calculate(fileName, threadnr):
+    print("Thread nr {} started to scan {} file...".format(threadnr, fileName))
+    outFile = open('../Thread_{}.txt'.format(threadnr), 'a')
+    outFile.write('Parent process:{} \n process id: {} \n'.format(os.getppid(), os.getpid()))
+    minNum = 0
+    maxNum = 0
+    #print('parent process:', os.getppid())
+    #print('process id:', os.getpid())
+    with open(fileName) as f:
+        #print("File: {} in thread {} scanning...".format(fileName,threadname))
         content = f.readlines()
         for num in content:
             num = int(num)
             if getPrimary(num):
                 if num > maxNum:
                     maxNum = num
+                if minNum == 0:
+                    minNum = num
                 if num < minNum:
                     minNum = num 
-                print("    ({}) Primary Number: {}".format(threadname, num))
-    #f.close
+                outFile.write("    ({}) Primary Number: {} \n".format(threadnr, num))
+                #print("    ({}) Primary Number: {}".format(threadnr, num))
+    outFile.write("{} finished. Max - {}, Min - {} \n".format(threadnr, maxNum, minNum))
+    print("Thread nr {} finished scanning file {} ".format(threadnr, fileName))
+    outFile.close
+    f.close
         
 
 
@@ -77,38 +89,18 @@ if __name__ == '__main__':
     files = getFiles(rootPath)
 
     filesScanned = 0
-    minNum = 0
-    maxNum = 0
 
     # get first file from list
-    ##for fName in files:
+    jobs = []
     while filesScanned < len(files):
-        try:
-            _thread.start_new_thread(calculate,(files,filesScanned,maxNum, minNum, "Thread-1"))
-            filesScanned = filesScanned + 1
-            _thread.start_new_thread(calculate,(files,filesScanned,maxNum, minNum, "Thread-2"))
-            filesScanned = filesScanned + 1
-            _thread.start_new_thread(calculate,(files,filesScanned,maxNum, minNum, "Thread-3"))
-            filesScanned = filesScanned + 1
-            _thread.start_new_thread(calculate,(files,filesScanned,maxNum, minNum, "Thread-4"))
-            filesScanned = filesScanned + 1
-        except:
-            print("Error: unable to start thread")
-        """with open(files[filesScanned]) as f:
-            print("File: {}".format(files[filesScanned]))
-            filesScanned = filesScanned + 1
-            content = f.readlines()
-            for num in content:
-                num = int(num)
-                if getPrimary(num):
-                    if num > maxNum:
-                        maxNum = num
-                    if num < minNum:
-                        minNum = num 
-                    print("     Primary Number: {}".format(num))
-            f.close
-        """
-                
-        # start thread 1
-        # remove first file from list
-        # scan file for primary numbers and show output 
+        
+        active = multiprocessing.active_children()
+        if len(active) < 4:
+            try:
+                print("starting file: {}, threads count - ".format(files[filesScanned]), len(active))
+                p = multiprocessing.Process(target = calculate, args = (files[filesScanned], filesScanned, ))
+                jobs.append(p)
+                p.start()              
+                filesScanned = filesScanned + 1               
+            except:
+                print("Error: unable to start thread")
